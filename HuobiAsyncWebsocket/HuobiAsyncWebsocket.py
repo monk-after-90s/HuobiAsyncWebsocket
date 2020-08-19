@@ -1,9 +1,6 @@
 import asyncio
-import base64
-import datetime
-import hashlib
-import hmac
 import json
+import traceback
 from copy import deepcopy
 
 import beeprint
@@ -11,8 +8,7 @@ from loguru import logger
 
 import websockets
 from NoLossAsyncGenerator import NoLossAsyncGenerator
-
-import urllib
+from ensureTaskCanceled import ensureTaskCanceled
 
 from HuobiAsyncWebsocket.UrlParamsBuilder import create_signature, UrlParamsBuilder
 
@@ -29,6 +25,8 @@ class HuobiAsyncWs:
         self._ws_ok: asyncio.Future = None
         self._handlers = set()
         self._exiting = False
+        self._ws_runner_task: asyncio.Task = None
+        self._ws_generator: NoLossAsyncGenerator = None
 
     async def exit(self):
         self._exiting = True
@@ -64,7 +62,11 @@ class HuobiAsyncWs:
         #         'ts': 1597729470150,
         #     },
         # }
+        _wait_next_ping_timeout_task = None
         async for ping in self.filter_stream([{'action': 'ping'}]):
+            # 心跳来临，上次放的超时监控协程若没超时，就取消
+            if _wait_next_ping_timeout_task and not _wait_next_ping_timeout_task.done():
+                asyncio.create_task(ensureTaskCanceled(_wait_next_ping_timeout_task))
             pong = json.dumps({
                 "action": "pong",
                 "data": {
@@ -80,6 +82,18 @@ class HuobiAsyncWs:
                     "ts": ping['data']['ts']
                 }
             }, output=False, string_break_enable=False, sort_keys=False))
+            # 心跳处理完毕，放一个协程严防心跳超时
+            _wait_next_ping_timeout_task = asyncio.create_task(self._wait_next_ping_timeout())
+
+    async def _wait_next_ping_timeout(self):
+        '''
+        等待下一个ping30s就超时，超时删除老的ws运行
+
+        :return:
+        '''
+        await asyncio.sleep(30)
+        await self._ws_generator.close()
+        await ensureTaskCanceled(self._ws_runner_task)
 
     async def _get_authentication(self):
 
@@ -103,15 +117,26 @@ class HuobiAsyncWs:
         }
         await self._ws.send(json.dumps(auth_request))
 
-    async def _ws_manager(self):
+    async def _ws_runner(self):
         self._ws = await websockets.connect(self.ws_baseurl)
+        logger.info('New connection opened.')
         # 鉴权
         asyncio.create_task(self._get_authentication())
 
+        # 如果被删除，负责关闭自己打开的ws连接
+        def cancel_ws(task: asyncio.Task):
+            async def close_old_ws():
+                await asyncio.create_task(self._ws.close())
+                logger.info('Old connection closed.')
+
+            asyncio.create_task(close_old_ws())
+
+        self._ws_runner_task.add_done_callback(cancel_ws)
+        # 通知实例化完成
         if not self._ws_ok.done():
             self._ws_ok.set_result(None)
-        asyncio.create_task(self._pong())
-        async for msg in NoLossAsyncGenerator(self._ws):
+        self._ws_generator = NoLossAsyncGenerator(self._ws)
+        async for msg in self._ws_generator:
             msg = json.loads(msg)
             logger.debug('\n' + beeprint.pp(msg, output=False, string_break_enable=False, sort_keys=False))
             tasks = []
@@ -121,6 +146,18 @@ class HuobiAsyncWs:
                 else:
                     handler(deepcopy(msg))
             [await task for task in tasks]
+
+    async def _ws_manager(self):
+        # 心跳处理
+        asyncio.create_task(self._pong())
+        while not self._exiting:
+            try:
+                self._ws_runner_task = asyncio.create_task(self._ws_runner())
+                await self._ws_runner_task
+            except asyncio.CancelledError:  # 心跳超时更换 todo 测试故意心跳超时
+                logger.info('\n' + traceback.format_exc())
+            except:  # 其他异常更换 todo 测试其他报错
+                logger.error('\n' + traceback.format_exc())
 
     @classmethod
     async def create_instance(cls, apikey, secret):
