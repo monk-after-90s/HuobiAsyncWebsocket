@@ -125,12 +125,13 @@ class HuobiAsyncWs:
 
         # 如果被删除，负责关闭自己打开的ws连接
         def cancel_ws(task: asyncio.Task):
-            async def close_old_ws():
-                await asyncio.create_task(self._ws.close())
+            async def close_old_ws(ws):
+                await asyncio.create_task(ws.close())
                 logger.info('Old connection closed.')
 
-            asyncio.create_task(close_old_ws())
+            asyncio.create_task(close_old_ws(task._opened_ws))
 
+        self._ws_runner_task._opened_ws = self._ws
         self._ws_runner_task.add_done_callback(cancel_ws)
         # 通知实例化完成
         if not self._ws_ok.done():
