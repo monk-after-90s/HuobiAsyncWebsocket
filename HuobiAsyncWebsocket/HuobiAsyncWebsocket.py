@@ -70,7 +70,7 @@ class HuobiAsyncWs:
                 "data": {
                     "ts": ping['data']['ts']
                 }
-            }).encode()
+            })
             # print(f'准备pong:\n{repr(pong)}')
             await self._ws.send(pong)
             # print('pong发完')
@@ -110,7 +110,7 @@ class HuobiAsyncWs:
 
         if not self._ws_ok.done():
             self._ws_ok.set_result(None)
-        # asyncio.create_task(self._pong())
+        asyncio.create_task(self._pong())
         async for msg in NoLossAsyncGenerator(self._ws):
             msg = json.loads(msg)
             logger.debug('\n' + beeprint.pp(msg, output=False, string_break_enable=False, sort_keys=False))
