@@ -119,7 +119,7 @@ class HuobiAsyncWs:
 
     async def _ws_runner(self):
         self._ws = await websockets.connect(self.ws_baseurl)
-        logger.info('New connection opened.')
+        logger.info('New huobi ws connection opened.')
         # 鉴权
         asyncio.create_task(self._get_authentication())
 
@@ -127,7 +127,7 @@ class HuobiAsyncWs:
         def cancel_ws(task: asyncio.Task):
             async def close_old_ws(ws):
                 await asyncio.create_task(ws.close())
-                logger.info('Old connection closed.')
+                logger.info('Old huobi ws connection closed.')
 
             asyncio.create_task(close_old_ws(task._opened_ws))
 
