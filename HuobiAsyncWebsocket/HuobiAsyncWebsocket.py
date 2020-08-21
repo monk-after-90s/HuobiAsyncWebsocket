@@ -25,7 +25,7 @@ class HuobiAsyncWs:
         self._ws_ok: asyncio.Future = None
         self._handlers = set()
         self._exiting = False
-        self._ws_runner_task: asyncio.Task = None
+        self._update_ws_task: asyncio.Task = None
         self._ws_generator: NoLossAsyncGenerator = None
 
     async def exit(self):
@@ -117,7 +117,19 @@ class HuobiAsyncWs:
         }
         await self._ws.send(json.dumps(auth_request))
 
-    async def _ws_runner(self):
+    async def _update_ws(self, old_ws):
+        '''
+        安全处理老的ws连接，建立新的ws连接
+
+        :param old_ws: 老的ws连接
+        :return:
+        '''
+        # 安全退出老的ws
+        if isinstance(self._ws_generator, NoLossAsyncGenerator):
+            await self._ws_generator.close()
+        if isinstance(old_ws, asyncio.Task) and not old_ws.done():
+            asyncio.create_task(ensureTaskCanceled(old_ws))
+
         self._ws = await websockets.connect(self.ws_baseurl)
         logger.info('New huobi ws connection opened.')
         # 鉴权
@@ -131,8 +143,8 @@ class HuobiAsyncWs:
 
             asyncio.create_task(close_old_ws(task._opened_ws))
 
-        self._ws_runner_task._opened_ws = self._ws
-        self._ws_runner_task.add_done_callback(cancel_ws)
+        self._update_ws_task._opened_ws = self._ws
+        self._update_ws_task.add_done_callback(cancel_ws)
         # 通知实例化完成
         if not self._ws_ok.done():
             self._ws_ok.set_result(None)
