@@ -17,7 +17,7 @@ else:
     test_secret = input('Test secret:')
 
 
-class CommonTest(AsyncTestCase):
+class CommonTest(AsyncTestCase):  # todo 超量订单信息测试
     enable_test = True
     aws: HuobiAsyncWs = None
 
