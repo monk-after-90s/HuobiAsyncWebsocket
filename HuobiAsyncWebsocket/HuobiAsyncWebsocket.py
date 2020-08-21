@@ -64,38 +64,27 @@ class HuobiAsyncWs:
         #         'ts': 1597729470150,
         #     },
         # }
-        _wait_next_ping_timeout_task = None
-        async for ping in self.filter_stream([{'action': 'ping'}]):
-            # 心跳来临，上次放的超时监控协程若没超时，就取消
-            if _wait_next_ping_timeout_task and not _wait_next_ping_timeout_task.done():
-                asyncio.create_task(ensureTaskCanceled(_wait_next_ping_timeout_task))
-            pong = json.dumps({
-                "action": "pong",
-                "data": {
-                    "ts": ping['data']['ts']
-                }
-            })
-            # print(f'准备pong:\n{repr(pong)}')
-            await self._ws.send(pong)
-            # print('pong发完')
-            logger.debug('\n' + beeprint.pp({
-                "action": "pong",
-                "data": {
-                    "ts": ping['data']['ts']
-                }
-            }, output=False, string_break_enable=False, sort_keys=False))
-            # 心跳处理完毕，放一个协程严防心跳超时
-            _wait_next_ping_timeout_task = asyncio.create_task(self._wait_next_ping_timeout())
-
-    async def _wait_next_ping_timeout(self):
-        '''
-        等待下一个ping30s就超时，超时删除老的ws运行
-
-        :return:
-        '''
-        await asyncio.sleep(30)
-        await self._ws_generator.close()
-        await ensureTaskCanceled(self._ws_runner_task)
+        ping_aiter = self.filter_stream([{'action': 'ping'}])
+        while True:
+            try:
+                # 等心跳只能等30s，否则超时
+                ping = await asyncio.wait_for(ping_aiter.__anext__(), 30)
+            except asyncio.TimeoutError:  # 等心跳超时 todo 测试故意心跳超时
+                self._update_ws_event.set()
+            else:
+                pong = json.dumps({
+                    "action": "pong",
+                    "data": {
+                        "ts": ping['data']['ts']
+                    }
+                })
+                await self._ws.send(pong)
+                logger.debug('\n' + beeprint.pp({
+                    "action": "pong",
+                    "data": {
+                        "ts": ping['data']['ts']
+                    }
+                }, output=False, string_break_enable=False, sort_keys=False))
 
     async def _get_authentication(self):
 
