@@ -4,7 +4,7 @@ with open("README.md", "r") as fh:
     long_description = fh.read()
 
 setuptools.setup(
-    name="HuobiAsyncWs",
+    name="HuobiAsyncWebsocket",
     version="1.0.0",
     author="Antas",
     author_email="",
