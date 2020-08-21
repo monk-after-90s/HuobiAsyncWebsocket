@@ -27,6 +27,8 @@ class HuobiAsyncWs:
         self._exiting = False
         self._update_ws_task: asyncio.Task = None
         self._ws_generator: NoLossAsyncGenerator = None
+        self._update_ws_event = asyncio.Event()  # 用来提示所有的需要更新连接的情况
+        self._update_ws_event.set()  # 刚开始就需要更新连接，最初新建
 
     async def exit(self):
         self._exiting = True
@@ -178,13 +180,11 @@ class HuobiAsyncWs:
         # 心跳处理
         asyncio.create_task(self._pong())
         while not self._exiting:
-            try:
-                self._ws_runner_task = asyncio.create_task(self._ws_runner())
-                await self._ws_runner_task
-            except asyncio.CancelledError:  # 心跳超时更换 todo 测试故意心跳超时
-                logger.info('\n' + traceback.format_exc())
-            except:  # 其他异常更换 todo 测试其他报错
-                logger.error('\n' + traceback.format_exc())
+            # 等待需要更新连接的信号
+            await self._update_ws_event.wait()
+            # 更新连接
+            self._update_ws_task = asyncio.create_task(self._update_ws(self._update_ws_task))
+            self._update_ws_event.clear()
 
     @classmethod
     async def create_instance(cls, apikey, secret):
