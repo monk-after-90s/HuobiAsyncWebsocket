@@ -1,12 +1,20 @@
 import asyncio
+import json
+import os
 
 import asyncUnittest
 from asyncUnittest import AsyncTestCase
 
 from HuobiAsyncWebsocket.HuobiAsyncWebsocket import HuobiAsyncWs
 
-test_apikey = input('Test apikey:')
-test_secret = input('Test secret:')
+if os.path.exists(os.path.join(os.path.dirname(__file__), 'key_secret.json')):
+    with open('key_secret.json') as f:
+        key_secret = json.load(f)
+        test_apikey = key_secret['apikey']
+        test_secret = key_secret['secret']
+else:
+    test_apikey = input('Test apikey:')
+    test_secret = input('Test secret:')
 
 
 class CommonTest(AsyncTestCase):
