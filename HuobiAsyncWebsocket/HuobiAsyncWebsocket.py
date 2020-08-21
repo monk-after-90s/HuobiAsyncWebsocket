@@ -68,7 +68,7 @@ class HuobiAsyncWs:
             try:
                 # 等心跳只能等30s，否则超时
                 ping = await asyncio.wait_for(ping_aiter.__anext__(), 30)
-            except asyncio.TimeoutError:  # 等心跳超时 todo 测试故意心跳超时
+            except asyncio.TimeoutError:  # 等心跳超时
                 logger.debug('Ping timeout.')
                 self._update_ws_event.set()
             else:
