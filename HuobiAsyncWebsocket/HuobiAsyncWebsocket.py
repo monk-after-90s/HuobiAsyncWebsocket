@@ -141,9 +141,8 @@ class HuobiAsyncWs:
         if not self._ws_ok.done():
             self._ws_ok.set_result(None)
         self._ws_generator = NoLossAsyncGenerator(self._ws)
-        try:
-            async for msg in self._ws_generator:
-
+        async for msg in self._ws_generator:
+            try:
                 msg = json.loads(msg)
                 logger.debug('\n' + beeprint.pp(msg, output=False, string_break_enable=False, sort_keys=False))
                 tasks = []
@@ -160,11 +159,8 @@ class HuobiAsyncWs:
                         await task
                     except:
                         pass
-
-        except:
-            # 其他异常更换 todo 测试其他报错
-            logger.error('\n' + traceback.format_exc())
-            self._update_ws_event.set()
+            except:
+                logger.error('\n' + traceback.format_exc())
 
     async def _ws_manager(self):
         # 心跳处理
