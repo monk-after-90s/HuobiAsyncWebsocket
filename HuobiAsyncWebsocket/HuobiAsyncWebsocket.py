@@ -13,7 +13,6 @@ from NoLossAsyncGenerator import NoLossAsyncGenerator
 from HuobiAsyncWebsocket.UrlParamsBuilder import create_signature, UrlParamsBuilder
 
 
-# todo 测试重复订阅是否幂等
 class HuobiAsyncWs:
     ws_baseurl = 'wss://api-aws.huobi.pro/ws/v2'
 
@@ -22,7 +21,6 @@ class HuobiAsyncWs:
         self._secret = secret
         # self._session: aiohttp.ClientSession = None
         self._ws: websockets.WebSocketClientProtocol = None
-        self._ws_ok: asyncio.Future = None
         self._handlers = set()
         self._exiting = False
         self._update_ws_task: asyncio.Task = None
@@ -109,6 +107,14 @@ class HuobiAsyncWs:
         }
         await self._ws.send(json.dumps(auth_request))
 
+    async def _wait_authenticated(self):
+        async for authentication_msg in self.stream_filter([{
+            'action': 'req',
+            'code': 200,
+            'ch': 'auth'
+        }]):
+            break
+
     async def _update_ws(self, old_ws_update_ws_task):
         '''
         安全处理老的ws连接，建立新的ws连接
@@ -129,9 +135,6 @@ class HuobiAsyncWs:
             # logger.debug('Start canceling old_ws_update_ws_task')
             # logger.debug('old_ws_update_ws_task .')
 
-        # 通知实例化完成
-        if not self._ws_ok.done():
-            self._ws_ok.set_result(None)
         async for msg in self._ws:
             try:
                 # logger.debug(repr(old_ws_update_ws_task))
@@ -179,10 +182,9 @@ class HuobiAsyncWs:
     @classmethod
     async def create_instance(cls, apikey, secret):
         self = cls(apikey, secret)
-        self._ws_ok = asyncio.get_running_loop().create_future()
         # 启动ws管理器
         asyncio.create_task(self._ws_manager())
-        await self._ws_ok
+        await self._wait_authenticated()
         return self
 
     def stream_filter(self, _filters: list = None):
@@ -244,7 +246,13 @@ class HuobiAsyncWs:
 
         :return:
         '''
-        return self.filter_stream([{"e": "executionReport"}])
+        # 订阅订单信息
+        asyncio.create_task(self._ws.send(json.dumps(
+            {
+                "action": "sub",
+                "ch": "orders#*"
+            })))
+        return self.stream_filter([{"action": "push"}])
 
 
 if __name__ == '__main__':
