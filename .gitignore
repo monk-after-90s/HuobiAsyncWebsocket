@@ -127,9 +127,7 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
-test.py
-2test.py
-3test.py
+*test.py
 .idea
 .DS_Store
 *.egg-info
