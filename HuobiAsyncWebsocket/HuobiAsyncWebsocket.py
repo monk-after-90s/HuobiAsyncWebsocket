@@ -64,7 +64,7 @@ class HuobiAsyncWs:
         #         'ts': 1597729470150,
         #     },
         # }
-        ping_aiter = self.filter_stream([{'action': 'ping'}])
+        ping_aiter = self.stream_filter([{'action': 'ping'}])
         while True:
             try:
                 # 等心跳只能等30s，否则超时
@@ -87,6 +87,7 @@ class HuobiAsyncWs:
                 }, output=False, string_break_enable=False, sort_keys=False))
 
     async def _get_authentication(self):
+        '''不鉴权无心跳'''
 
         builder = UrlParamsBuilder()
         create_signature(api_key=self._apikey,
@@ -184,7 +185,7 @@ class HuobiAsyncWs:
         await self._ws_ok
         return self
 
-    def filter_stream(self, _filters: list = None):
+    def stream_filter(self, _filters: list = None):
         '''
         Filter the ws data stream and push the filtered data to the async generator which is returned by the method.
         Remember to explicitly call the close method of the async generator to close the stream.
