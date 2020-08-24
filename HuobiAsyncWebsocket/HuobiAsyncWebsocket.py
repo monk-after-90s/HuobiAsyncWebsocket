@@ -109,12 +109,16 @@ class HuobiAsyncWs:
         await self._ws.send(json.dumps(auth_request))
 
     async def _wait_authenticated(self):
-        async for authentication_msg in self.stream_filter([{
+        authenticated_stream = self.stream_filter([{
             'action': 'req',
             'code': 200,
             'ch': 'auth'
-        }]):
-            break
+        }])
+        try:
+            async for authentication_msg in authenticated_stream:
+                break
+        finally:
+            asyncio.create_task(authenticated_stream.close())
 
     async def _update_ws(self, old_ws_update_ws_task):
         '''
