@@ -26,6 +26,7 @@ class HuobiAsyncWs:
         self._update_ws_task: asyncio.Task = None
         self._update_ws_event = asyncio.Event()  # 用来提示所有的需要更新连接的情况
         self._update_ws_event.set()  # 刚开始就需要更新连接，最初新建
+        self._subs = set()
 
     async def exit(self):
         self._exiting = True
@@ -246,12 +247,13 @@ class HuobiAsyncWs:
 
         :return:
         '''
+        all_orders_sub = {
+            "action": "sub",
+            "ch": "orders#*"
+        }
+        self._subs.add(all_orders_sub)
         # 订阅订单信息
-        asyncio.create_task(self._ws.send(json.dumps(
-            {
-                "action": "sub",
-                "ch": "orders#*"
-            })))
+        asyncio.create_task(self._ws.send(json.dumps(all_orders_sub)))
         return self.stream_filter([{"action": "push"}])
 
 
