@@ -79,7 +79,7 @@ class HuobiAsyncWs(AsyncWebsocketStreamInterface):
         # 鉴权
         await self._ensure_authenticated()
         # 订阅所有订阅记录
-        [await task for task in [asyncio.create_task(self.send(json.dumps(sub))) for sub in self._subs]]
+        [await task for task in [asyncio.create_task(self.send(sub)) for sub in self._subs]]
         # 心跳检测
         # {
         #     'action': 'ping',
@@ -112,9 +112,13 @@ class HuobiAsyncWs(AsyncWebsocketStreamInterface):
                 }, output=False, string_break_enable=False, sort_keys=False))
 
     def add_subscription(self, new_sub: dict):
-        self._subs.add(new_sub)
+        b_new_sub = json.dumps(new_sub)
+        self._subs.add(b_new_sub)
         # 订阅订单信息
-        asyncio.create_task(self.send(json.dumps(new_sub)))
+        try:
+            asyncio.create_task(self.send(b_new_sub))
+        except:
+            pass
 
     def all_order_stream(self):
         '''
