@@ -27,7 +27,8 @@ class CommonTest(AsyncTestCase):  # todo 超量订单信息测试
 
     @classmethod
     async def tearDownClass(cls) -> None:
-        await cls.aws.exit()
+        if isinstance(cls.aws, HuobiAsyncWs):
+            await cls.aws.exit()
 
     async def test_ping_pong(self):
         n = 3
