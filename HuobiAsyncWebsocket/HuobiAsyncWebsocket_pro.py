@@ -116,7 +116,7 @@ class HuobiAsyncWs(AsyncWebsocketStreamInterface):
         # 订阅订单信息
         asyncio.create_task(self.send(json.dumps(new_sub)))
 
-    def order_stream(self):
+    def all_order_stream(self):
         '''
         Filter the ws order data stream and push the filtered data to the async generator which is returned by the method.
         Remember to explicitly call the close method of the async generator to close the stream.
