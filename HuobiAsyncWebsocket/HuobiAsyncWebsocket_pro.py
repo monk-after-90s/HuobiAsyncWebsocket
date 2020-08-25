@@ -111,6 +111,11 @@ class HuobiAsyncWs(AsyncWebsocketStreamInterface):
                     }
                 }, output=False, string_break_enable=False, sort_keys=False))
 
+    def add_subscription(self, new_sub: dict):
+        self._subs.add(new_sub)
+        # 订阅订单信息
+        asyncio.create_task(self.send(json.dumps(new_sub)))
+
     def order_stream(self):
         '''
         Filter the ws order data stream and push the filtered data to the async generator which is returned by the method.
@@ -133,8 +138,6 @@ class HuobiAsyncWs(AsyncWebsocketStreamInterface):
             "action": "sub",
             "ch": "orders#*"
         }
-        self._subs.add(all_orders_sub)
-        # 订阅订单信息
-        asyncio.create_task(self.send(json.dumps(all_orders_sub)))
+        self.add_subscription(all_orders_sub)
         return self.stream_filter([{'action': 'push',
                                     'ch': 'orders#*'}])
