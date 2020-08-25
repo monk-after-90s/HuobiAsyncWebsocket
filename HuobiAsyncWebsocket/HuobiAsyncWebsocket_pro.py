@@ -94,6 +94,7 @@ class HuobiAsyncWs(AsyncWebsocketStreamInterface):
                 ping = await asyncio.wait_for(ping_aiter.__anext__(), 30)
             except asyncio.TimeoutError:  # 等心跳超时
                 logger.debug('Ping timeout.')
+                asyncio.create_task(ping_aiter.close())
                 break
             else:
                 pong = json.dumps({
