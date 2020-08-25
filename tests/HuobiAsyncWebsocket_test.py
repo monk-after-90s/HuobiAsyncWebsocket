@@ -54,19 +54,23 @@ class TestPingTimeOut(AsyncTestCase):
 
     @classmethod
     async def setUpClass(cls):
-        cls.aws = await HuobiAsyncWs.create_instance(test_apikey, test_secret)
+        cls.aws = HuobiAsyncWs(test_apikey, test_secret)
 
     @classmethod
     async def tearDownClass(cls) -> None:
-        await cls.aws.exit()
+        try:
+            await cls.aws.exit()
+        except:
+            pass
 
     async def test_ping_time_out(self):
-        old_raw_ws = type(self).aws._ws
         n = 0
+        await asyncio.sleep(1)
         pingpong_handler = list(type(self).aws._handlers)[0]
+        old_raw_ws = type(self).aws.present_ws
         async for ping in self.aws.stream_filter([{'action': 'ping'}]):
             if n == 0:
-                self.assertIs(type(self).aws._ws, old_raw_ws)
+                self.assertIs(type(self).aws.present_ws, old_raw_ws)
                 # 清理pingpong_handler致使下次心跳肯定超时
                 type(self).aws._handlers.remove(pingpong_handler)
             elif n == 1:
@@ -74,7 +78,8 @@ class TestPingTimeOut(AsyncTestCase):
                 # 恢复心跳传递
                 type(self).aws._handlers.add(pingpong_handler)
             elif n == 2:
-                self.assertIsNot(type(self).aws._ws, old_raw_ws)
+                self.assertIsNot(type(self).aws.present_ws, old_raw_ws)
+                self.assertTrue(old_raw_ws.closed)
             n += 1
             if n >= 4:
                 break
