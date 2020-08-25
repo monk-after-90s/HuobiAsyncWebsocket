@@ -5,7 +5,7 @@ import os
 import asyncUnittest
 from asyncUnittest import AsyncTestCase
 
-from HuobiAsyncWebsocket.HuobiAsyncWebsocket import HuobiAsyncWs
+from HuobiAsyncWebsocket.HuobiAsyncWebsocket_pro import HuobiAsyncWs
 
 if os.path.exists(os.path.join(os.path.dirname(__file__), 'key_secret.json')):
     with open('key_secret.json') as f:
@@ -23,7 +23,7 @@ class CommonTest(AsyncTestCase):  # todo 超量订单信息测试
 
     @classmethod
     async def setUpClass(cls):
-        cls.aws = await HuobiAsyncWs.create_instance(test_apikey, test_secret)
+        cls.aws = HuobiAsyncWs(test_apikey, test_secret)
 
     @classmethod
     async def tearDownClass(cls) -> None:
