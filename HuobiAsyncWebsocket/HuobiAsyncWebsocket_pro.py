@@ -6,7 +6,7 @@ from loguru import logger
 
 import websockets
 
-from HuobiAsyncWebsocket.AsyncWebsocketStreamInterface import AsyncWebsocketStreamInterface
+from AsyncWebsocketStreamInterface import AsyncWebsocketStreamInterface
 from HuobiAsyncWebsocket.UrlParamsBuilder import create_signature, UrlParamsBuilder
 
 
