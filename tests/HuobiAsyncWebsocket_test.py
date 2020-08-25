@@ -144,15 +144,26 @@ class TestPingTimeOut(AsyncTestCase):
     '''
     enable_test = 1
     aws: HuobiAsyncWs = None
+    huobi: ccxt.huobipro = None
 
     @classmethod
     async def setUpClass(cls):
         cls.aws = HuobiAsyncWs(test_apikey, test_secret)
+        cls.huobi = ccxt.huobipro({
+            "apiKey": test_apikey,
+            "secret": test_secret,
+            "enableRateLimit": True, })
 
     @classmethod
     async def tearDownClass(cls) -> None:
+        huobi_exit_task = asyncio.create_task(cls.huobi.close())
+        aws_exit_task = asyncio.create_task(cls.aws.exit())
         try:
-            await cls.aws.exit()
+            await huobi_exit_task
+        except:
+            pass
+        try:
+            await aws_exit_task
         except:
             pass
 
@@ -161,6 +172,8 @@ class TestPingTimeOut(AsyncTestCase):
         await asyncio.sleep(1)
         pingpong_handler = list(type(self).aws._handlers)[0]
         old_raw_ws = type(self).aws.present_ws
+        # 开启订单数据流即刻关上，以发出订阅
+        asyncio.create_task(type(self).aws.all_order_stream().close())
         async for ping in self.aws.stream_filter([{'action': 'ping'}]):
             if n == 0:
                 self.assertIs(type(self).aws.present_ws, old_raw_ws)
@@ -173,9 +186,26 @@ class TestPingTimeOut(AsyncTestCase):
             elif n == 2:
                 self.assertIsNot(type(self).aws.present_ws, old_raw_ws)
                 self.assertTrue(old_raw_ws.closed)
-            n += 1
-            if n >= 4:
                 break
+
+            n += 1
+        # 更换ws后的订阅
+        order_stream = type(self).aws.stream_filter([{'action': 'push',
+                                                      'ch': 'orders#*'}])
+        open_order_task = asyncio.create_task(type(self).huobi.create_order('BTC/USDT', 'limit', 'buy', 0.001, 5000))
+        async for msg in order_stream:
+            if msg['data']['eventType'] == 'creation' and msg['data']['orderPrice'] == '5000' and \
+                    msg['data']['type'] == 'buy-limit' and msg['data']['symbol'] == "btcusdt" and \
+                    msg['data']['orderSize'] == '0.001':
+                order_info = await open_order_task
+                self.assertEqual(str(msg['data']['orderId']), order_info['id'])
+                self.assertEqual(order_info['symbol'], 'BTC/USDT')
+                # 撤单
+                asyncio.create_task(type(self).huobi.cancel_order(order_info['id'], order_info['symbol']))
+            elif msg['data']['eventType'] == 'cancellation' and \
+                    str(msg['data']['orderId']) == order_info['id'] and msg['data']['orderStatus'] == 'canceled':
+                break
+        await order_stream.close()
 
 
 if __name__ == '__main__':
