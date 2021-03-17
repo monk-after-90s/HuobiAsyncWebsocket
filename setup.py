@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="HuobiAsyncWebsocket",
-    version="1.1.1",
+    version="1.1.2",
     author="Antas",
     author_email="",
     description="Asynchronous huobi websocket SDK",
