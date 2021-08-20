@@ -30,9 +30,27 @@ class HuobiAsyncWs(AsyncWebsocketStreamInterface):
         '''
         # 新建ws连接
         ws = await websockets.connect(self.ws_baseurl)
+
+        # 鉴权
+        asyncio.create_task(self._authenticate(ws))
+        authentication_stream = self.stream_filter([{
+            'action': 'req',
+            'code': 200,
+            'ch': 'auth'
+        }])
+        try:
+            async for msg in ws:
+                msg = json.loads(msg)
+                print(f'msg={msg}')
+                if isinstance(msg, dict) and msg.get('action') == 'req' and \
+                        msg.get('code') == 200 and msg.get('ch') == 'auth':
+                    break
+        finally:
+            asyncio.create_task(authentication_stream.close())
+
         return ws
 
-    async def _authenticate(self):
+    async def _authenticate(self, ws):
         '''不鉴权无心跳'''
 
         builder = UrlParamsBuilder()
@@ -53,21 +71,7 @@ class HuobiAsyncWs(AsyncWebsocketStreamInterface):
                 "signature": builder.param_map['signature']
             }
         }
-        await self.send(json.dumps(auth_request))
-
-    async def _ensure_authenticated(self):
-        # 鉴权
-        asyncio.create_task(self._authenticate())
-        authentication_stream = self.stream_filter([{
-            'action': 'req',
-            'code': 200,
-            'ch': 'auth'
-        }])
-        try:
-            async for authentication_msg in authentication_stream:
-                break
-        finally:
-            asyncio.create_task(authentication_stream.close())
+        await ws.send(json.dumps(auth_request))
 
     async def _when2create_new_ws(self):
         '''
@@ -76,8 +80,6 @@ class HuobiAsyncWs(AsyncWebsocketStreamInterface):
         :return:
         '''
         # ws可用时期刚开始
-        # 鉴权
-        await self._ensure_authenticated()
         # 订阅所有订阅记录
         [await task for task in [asyncio.create_task(self.send(sub)) for sub in self._subs]]
         # 心跳检测
