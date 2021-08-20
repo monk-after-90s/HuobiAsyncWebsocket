@@ -14,12 +14,12 @@ if os.path.exists(os.path.join(os.path.dirname(__file__), 'key_secret.json')):
         test_apikey = key_secret['apikey']
         test_secret = key_secret['secret']
 else:
-    test_apikey = input('Test apikey:')
+    test_apikey = input('Test apikey，或者在同文件夹下放入文件key_secret.json,包含apikey和secret字典:')
     test_secret = input('Test secret:')
 
 
 class CommonTest(AsyncTestCase):
-    enable_test = True
+    enable_test = 1
     aws: HuobiAsyncWs = None
     huobi: ccxt.huobipro = None
 
@@ -136,25 +136,53 @@ class CommonTest(AsyncTestCase):
             elif msg['data']['eventType'] == 'cancellation' and \
                     str(msg['data']['orderId']) == order_info['id'] and msg['data']['orderStatus'] == 'canceled':
                 break
+        await self._test_huge_order_messages()
 
-    # async def test_huge_order_messages(self):
-    #     '''
-    #     超量订单信息测试
-    #
-    #     :return:
-    #     '''
-    #     open_order_tasks = [asyncio.create_task(type(self).huobi.create_order('BTC/USDT', 'limit', 'buy', 0.001, 5000))
-    #                         for _ in range(40)]
-    #     all_order_stream = type(self).aws.all_order_stream()
-    #     n = 0
-    #     async for msg in all_order_stream:
-    #         if msg['data']['eventType'] == 'creation' and msg['data']['orderPrice'] == '5000' and \
-    #                 msg['data']['type'] == 'buy-limit' and msg['data']['symbol'] == "btcusdt" and \
-    #                 msg['data']['orderSize'] == '0.001':
-    #             pass  # todo 跟上面的测试有冲突
-    #     await asyncio.gather(
-    #         *[type(self).huobi.cancel_order((await task)['id'], (await task)['symbol']) for task in open_order_tasks])
-    #     await all_order_stream.close()
+    async def _test_huge_order_messages(self):
+        '''
+        超量订单信息测试
+
+        :return:
+        '''
+        open_order_tasks = [asyncio.create_task(type(self).huobi.create_order('BTC/USDT', 'limit', 'buy', 0.001, 5000))
+                            for _ in range(10)]
+        all_order_stream = type(self).aws.all_order_stream()
+        n = 0
+        async for msg in all_order_stream:
+            if msg['data']['eventType'] == 'creation' and msg['data']['orderPrice'] == '5000' and \
+                    msg['data']['type'] == 'buy-limit' and msg['data']['symbol'] == "btcusdt" and \
+                    msg['data']['orderSize'] == '0.001':
+                n += 1
+                if n >= 10:
+                    break
+        [asyncio.create_task(type(self).huobi.cancel_order((await task)['id'], (await task)['symbol']))
+         for task in open_order_tasks]
+        # {
+        #     'action': 'push',
+        #     'ch': 'orders#*',
+        #     'data': {
+        #         'lastActTime': 1629444719402,
+        #         'execAmt': '0',
+        #         'orderSource': 'spot-api',
+        #         'orderPrice': '5000',
+        #         'orderSize': '0.001',
+        #         'remainAmt': '0.001',
+        #         'symbol': 'btcusdt',
+        #         'type': 'buy-limit',
+        #         'eventType': 'cancellation',
+        #         'clientOrderId': '',
+        #         'orderStatus': 'canceled',
+        #         'orderId': 348351566561874,
+        #     },
+        # }
+        async for msg in all_order_stream:
+            if msg['data']['eventType'] == 'cancellation' and msg['data']['orderPrice'] == '5000' and \
+                    msg['data']['type'] == 'buy-limit' and msg['data']['symbol'] == "btcusdt" and \
+                    msg['data']['orderSize'] == '0.001':
+                n -= 1
+                if n <= 0:
+                    break
+        await all_order_stream.close()
 
 
 class TestPingTimeOut(AsyncTestCase):
