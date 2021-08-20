@@ -236,23 +236,6 @@ class TestPingTimeOut(AsyncTestCase):
                 break
 
             n += 1
-        # 更换ws后的订阅
-        order_stream = type(self).aws.stream_filter([{'action': 'push',
-                                                      'ch': 'orders#*'}])
-        open_order_task = asyncio.create_task(type(self).huobi.create_order('BTC/USDT', 'limit', 'buy', 0.001, 5000))
-        async for msg in order_stream:
-            if msg['data']['eventType'] == 'creation' and msg['data']['orderPrice'] == '5000' and \
-                    msg['data']['type'] == 'buy-limit' and msg['data']['symbol'] == "btcusdt" and \
-                    msg['data']['orderSize'] == '0.001':
-                order_info = await open_order_task
-                self.assertEqual(str(msg['data']['orderId']), order_info['id'])
-                self.assertEqual(order_info['symbol'], 'BTC/USDT')
-                # 撤单
-                asyncio.create_task(type(self).huobi.cancel_order(order_info['id'], order_info['symbol']))
-            elif msg['data']['eventType'] == 'cancellation' and \
-                    str(msg['data']['orderId']) == order_info['id'] and msg['data']['orderStatus'] == 'canceled':
-                break
-        await order_stream.close()
 
 
 if __name__ == '__main__':
