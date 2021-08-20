@@ -113,14 +113,13 @@ class HuobiAsyncWs(AsyncWebsocketStreamInterface):
                     }
                 }, output=False, string_break_enable=False, sort_keys=False))
 
-    def add_subscription(self, new_sub: dict):
+    async def add_subscription(self, new_sub: dict):
         b_new_sub = json.dumps(new_sub)
         self._subs.add(b_new_sub)
         # 订阅订单信息
-        try:
-            asyncio.create_task(self.send(b_new_sub))
-        except:
-            pass
+        while not self.present_ws:
+            await asyncio.sleep(0)
+        asyncio.create_task(self.send(b_new_sub))
 
     def all_order_stream(self):
         '''
@@ -144,6 +143,6 @@ class HuobiAsyncWs(AsyncWebsocketStreamInterface):
             "action": "sub",
             "ch": "orders#*"
         }
-        self.add_subscription(all_orders_sub)
+        asyncio.create_task(self.add_subscription(all_orders_sub))
         return self.stream_filter([{'action': 'push',
                                     'ch': 'orders#*'}])
